@@ -6,6 +6,7 @@ class ProductBase(BaseModel):
     title: str = Field(..., min_length=3, description='Title of the product')
     amazon_url: HttpUrl = Field(..., description='Shortened Amazon URL of the product')
     current_price: Decimal = Field(..., description='Current price of the product', decimal_places=2)
+    image_url: str | None = Field(description="URL of the product image.")
     
 class ProductCreate(BaseModel):
     url: HttpUrl

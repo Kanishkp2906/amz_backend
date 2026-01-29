@@ -16,8 +16,9 @@ from schemas.price_history import *
 from schemas.tracking import *
 from utils.email_alert import check_and_send_alerts
 
-router = APIRouter(tags=['AMZ_Price_Tracker'])
+router = APIRouter()
 
+# Verify the domain is actaully an amazon domain.
 def verify_amazon_domain(product: ProductCreate) -> ProductCreate:
     domain = product.url.host
 
@@ -52,11 +53,19 @@ async def track_product(
         product_data = await get_amazon_price(product_url)
         title = product_data['title']
         current_price = product_data['price']
+        image_url = product_data['image_url']
+
+        if title is None and current_price == 0.0 and image_url is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Failed to fetch product details. Please try again later."
+            )
 
         new_product = Products(
             title = title,
             current_price = current_price,
-            amazon_url = clean_url
+            amazon_url = clean_url,
+            image_url = image_url
         )
         db.add(new_product)
         db.commit()
@@ -64,7 +73,6 @@ async def track_product(
         product_id = new_product.id
         product_current_price = new_product.current_price
 
-    # --- USER LOGIC (Guest/Auth) ---
     # Check if the user is new or already tracking a product.
     if user_session is None:
         user_uuid = str(uuid.uuid4())
@@ -82,7 +90,6 @@ async def track_product(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='User not found.')
         user_id = user.id
 
-    # --- PREVENT DUPLICATE TRACKING ---
     # Check if this specific user is *already* tracking this specific product.
     existing_tracking = db.query(Tracking).filter(
         Tracking.user_id == user_id,
@@ -108,7 +115,7 @@ async def track_product(
     return new_tracking
 
 # Route to return current user's all tracking products.
-@router.get('/traking_prodcuts', response_model=List[TrackingResponse])
+@router.get('/tracking_products', response_model=List[TrackingResponse])
 async def all_tracking_products(db: Session = Depends(get_db), user_session: str | None = Cookie(default=None)):
     if not user_session:
         return []

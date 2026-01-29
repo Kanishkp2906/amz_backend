@@ -20,6 +20,7 @@ class Products(Base):
     current_price = Column(Numeric(10, 2))
     last_checked = Column(DateTime(timezone=True), default=get_current_time)
     title = Column(String(500))
+    image_url = Column(String, nullable=True)
     tracking = relationship("Tracking", back_populates='product')
     history = relationship("PriceHistory", back_populates='product')
 
