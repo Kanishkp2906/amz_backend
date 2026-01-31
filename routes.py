@@ -15,6 +15,9 @@ from schemas.products import *
 from schemas.price_history import *
 from schemas.tracking import *
 from utils.email_alert import check_and_send_alerts
+import os
+
+is_production = os.getenv("RENDER") is not None
 
 router = APIRouter()
 
@@ -86,11 +89,12 @@ async def track_product(
         response.set_cookie(
             key="user_session",
             value=user_uuid,
-            httponly=False,
-            samesite=None,
+            httponly=True,
+            secure=is_production,
+            samesite=None if is_production else None,
             max_age=31536000,
             path="/",
-            domain='localhost'
+            domain=None
             )
 
     else:
