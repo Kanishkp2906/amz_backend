@@ -33,11 +33,12 @@ def verify_amazon_domain(product: ProductCreate) -> ProductCreate:
 @router.post("/track_product", response_model=TrackingResponse)
 async def track_product(
     response: Response,
-    data: ProductCreate = Depends(verify_amazon_domain),
+    data: ProductCreate,
     db: Session = Depends(get_db),
     user_session: str | None = Cookie(default=None)
     ):
 
+    data = verify_amazon_domain(data)
     # Getting the url from the user and checking if the product already exists.
     product_url = str(data.url)
     clean_url = url_shortner(product_url)
@@ -82,7 +83,15 @@ async def track_product(
         db.refresh(new_user)
         user_id = new_user.id
 
-        response.set_cookie(key="user_session", value=user_uuid)
+        response.set_cookie(
+            key="user_session",
+            value=user_uuid,
+            httponly=False,
+            samesite=None,
+            max_age=31536000,
+            path="/",
+            domain='localhost'
+            )
 
     else:
         user = db.query(Users).filter(Users.user_uuid == user_session).first()
@@ -266,6 +275,10 @@ async def submit_user_email(request: EmailRequest, db: Session = Depends(get_db)
     user = db.query(Users).filter(Users.user_uuid == user_session).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    existing_email = db.query(Users).filter(Users.email == request.email).first()
+    if existing_email:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists. Use a different email.")
     
     if user.email == request.email:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='You are already using this email.')

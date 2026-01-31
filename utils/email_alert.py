@@ -36,6 +36,11 @@ def check_and_send_alerts(db: Session):
                     <html>
                       <body>
                         <h2>Price Drop Alert!</h2>
+                        <div style="margin: 20px 0;">
+                            <a href="{product.amazon_url}">
+                            <img src="{product.image_url}" alt="Product Image" style="max-width: 300px; display: block;">
+                            </a>
+                        </div>
                         <p>The price of a product you are tracking has dropped by <b>{drop_percentage:.2f}%</b>.</p>
                         <p>Product: <b>{product.title}</b></p>
                         <p>Current Price: <b>₹{product.current_price}</b></p>
@@ -54,10 +59,10 @@ def check_and_send_alerts(db: Session):
 
     print('Alert check complete.')
 
-if __name__ == "__main__":
-    db = Sessionlocal()
-    try:
-        check_and_send_alerts(db)
-    finally:
-        db.close()
+# if __name__ == "__main__":
+#     db = Sessionlocal()
+#     try:
+#         check_and_send_alerts(db)
+#     finally:
+#         db.close()
 

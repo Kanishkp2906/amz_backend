@@ -5,7 +5,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from config import REDIS_URL
 
 redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
-    
+
 class RedisRateLimiter(BaseHTTPMiddleware):
     def __init__(self, app, limit=6, window=60):
         super().__init__(app)
@@ -13,8 +13,12 @@ class RedisRateLimiter(BaseHTTPMiddleware):
         self.window = window
 
     async def dispatch(self, request: Request, call_next):
+        # Skip rate limiting for CORS preflight requests
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         try:
-            user_uuid = request.cookies.get('user_session')
+            user_uuid = request.cookies.get("user_session")
             if not user_uuid:
                 raise HTTPException(status_code=401, detail="Invalid session")
 
@@ -29,7 +33,9 @@ class RedisRateLimiter(BaseHTTPMiddleware):
                 ttl = redis_client.ttl(redis_key)
                 return JSONResponse(
                     status_code=429,
-                    content= {"message": f"Rate limit exceede. Try after {ttl} seconds."}
+                    content={
+                        "message": f"Rate limit exceede. Try after {ttl} seconds."
+                    },
                 )
         except Exception as e:
             print(f"Error in rate limiting: {e}")

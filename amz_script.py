@@ -1,5 +1,5 @@
 import re
-import asyncio # <--- Import this for the delay
+import asyncio
 from playwright.async_api import async_playwright
 
 def clean_price(price_str: str) -> float:
@@ -96,6 +96,6 @@ async def get_amazon_price(product_url: str):
     print("All retry attempts failed.")
     return {"title": None, "price": 0.0, "image_url": None}
 
-if __name__ == "__main__":
-    url = "https://www.amazon.in/OnePlus-Snapdragon%C2%AE-7300mAh-Personalised-Game-Changing/dp/B0FTR2PJTV/?_encoding=UTF8&pd_rd_w=Ox8Bw&content-id=amzn1.sym.eb64ff86-b345-4426-98d6-57bdc23df42d&pf_rd_p=eb64ff86-b345-4426-98d6-57bdc23df42d&pf_rd_r=NRZ2ZYEDGXSTSC9Q7SP0&pd_rd_wg=TGDgs&pd_rd_r=d452d36d-3b4c-4a8d-bbc9-8e53283d6915&th=1"
-    print(asyncio.run((get_amazon_price(url))))
+# if __name__ == "__main__":
+#     url = "https://www.amazon.in/OnePlus-Snapdragon%C2%AE-7300mAh-Personalised-Game-Changing/dp/B0FTR2PJTV/?_encoding=UTF8&pd_rd_w=Ox8Bw&content-id=amzn1.sym.eb64ff86-b345-4426-98d6-57bdc23df42d&pf_rd_p=eb64ff86-b345-4426-98d6-57bdc23df42d&pf_rd_r=NRZ2ZYEDGXSTSC9Q7SP0&pd_rd_wg=TGDgs&pd_rd_r=d452d36d-3b4c-4a8d-bbc9-8e53283d6915&th=1"
+#     print(asyncio.run((get_amazon_price(url))))

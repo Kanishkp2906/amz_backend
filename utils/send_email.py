@@ -22,9 +22,9 @@ def send_email(recipient_email, subject, body):
     except Exception as e:
         print(f'Error while sending the email: {e}')
 
-if __name__ == "__main__":
-    recipient_email = 'kanishkprasad6@gmail.com'
-    subject = 'Final Testing the email server.'
-    body = "Final Testing the smtp server to send emails form the amz_price_tracker."
-    send_email(recipient_email, subject, body)
+# if __name__ == "__main__":
+#     recipient_email = 'kanishkprasad6@gmail.com'
+#     subject = 'Final Testing the email server.'
+#     body = "Final Testing the smtp server to send emails form the amz_price_tracker."
+#     send_email(recipient_email, subject, body)
     

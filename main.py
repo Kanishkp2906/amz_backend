@@ -8,6 +8,6 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="AMZ Price Tracker")
 
+app.add_middleware(RedisRateLimiter)
 add_cors_middleware(app)
 app.include_router(router)
-app.add_middleware(RedisRateLimiter)
