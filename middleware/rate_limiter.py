@@ -13,31 +13,31 @@ class RedisRateLimiter(BaseHTTPMiddleware):
         self.window = window
 
     async def dispatch(self, request: Request, call_next):
-        # Skip rate limiting for CORS preflight requests
+        
         if request.method == "OPTIONS":
             return await call_next(request)
 
         try:
             user_uuid = request.cookies.get("user_session")
-            if not user_uuid:
-                raise HTTPException(status_code=401, detail="Invalid session")
+            if user_uuid:
+                redis_key = f"ratelimiting:{user_uuid}"
+                redis_count = redis_client.get(redis_key)
 
-            redis_key = f"ratelimiting:{user_uuid}"
-            redis_count = redis_client.get(redis_key)
-
-            if redis_count is None:
-                redis_client.setex(redis_key, self.window, 1)
-            elif int(redis_count) <= self.limit:
-                redis_client.incr(redis_key)
-            else:
-                ttl = redis_client.ttl(redis_key)
-                return JSONResponse(
-                    status_code=429,
-                    content={
-                        "message": f"Rate limit exceede. Try after {ttl} seconds."
-                    },
-                )
+                if redis_count is None:
+                    redis_client.setex(redis_key, self.window, 1)
+                elif int(redis_count) <= self.limit:
+                    redis_client.incr(redis_key)
+                else:
+                    ttl = redis_client.ttl(redis_key)
+                    return JSONResponse(
+                        status_code=429,
+                        content={
+                            "message": f"Rate limit exceeded. Try after {ttl} seconds."
+                        },
+                    )
+            
         except Exception as e:
+            # Now this will only print REAL Redis errors
             print(f"Error in rate limiting: {e}")
 
         return await call_next(request)
