@@ -16,6 +16,7 @@ from schemas.price_history import *
 from schemas.tracking import *
 from utils.email_alert import check_and_send_alerts
 import os
+from random import random
 
 is_production = os.getenv("RENDER") is not None
 
@@ -205,13 +206,16 @@ async def delete_product_tracking(
         return product
 
 # Making a semaphore limit to run the tasks with limit and to not load up the server.
-semaphore = asyncio.Semaphore(3)
+semaphore = asyncio.Semaphore(1)
 
 # Method to update the price and last_checked of the product and create price_history.
 async def update_single_product(product_id: int, url: str, db: Session):
     current_datetime = get_current_time()
     async with semaphore:
         try:
+            delay = random.uniform(5, 10)
+            print(f"😴 Sleeping for {delay:.2f}s to avoid detection...")
+            await asyncio.sleep(delay)
             print(f"Starting update for: {product_id}...")
             data = await get_amazon_price(url)
             new_price = data['price']

@@ -1,0 +1,4 @@
+.venv
+amz.db
+__pycache__
+README.md
