@@ -206,39 +206,38 @@ async def delete_product_tracking(
         return product
 
 # Making a semaphore limit to run the tasks with limit and to not load up the server.
-semaphore = asyncio.Semaphore(1)
+# semaphore = asyncio.Semaphore(1)
 
 # Method to update the price and last_checked of the product and create price_history.
 async def update_single_product(product_id: int, url: str, db: Session):
     current_datetime = get_current_time()
-    async with semaphore:
-        try:
-            delay = random.uniform(5, 10)
-            print(f"😴 Sleeping for {delay:.2f}s to avoid detection...")
-            await asyncio.sleep(delay)
-            print(f"Starting update for: {product_id}...")
-            data = await get_amazon_price(url)
-            new_price = data['price']
+    try:
+        delay = random.uniform(5, 10)
+        print(f"😴 Sleeping for {delay:.2f}s to avoid detection...")
+        await asyncio.sleep(delay)
+        print(f"Starting update for: {product_id}...")
+        data = await get_amazon_price(url)
+        new_price = data['price']
 
-            product = db.query(Products).filter(Products.id == product_id).first()
+        product = db.query(Products).filter(Products.id == product_id).first()
 
-            if product:
-                product.current_price = new_price
-                product.last_checked = current_datetime
+        if product:
+            product.current_price = new_price
+            product.last_checked = current_datetime
 
-                history_entry = PriceHistory(
-                    product_id = product_id,
-                    price = new_price,
-                    recorded_at = current_datetime
-                )
-                db.add(history_entry)
-                db.commit()
-                print(f"Updated Product {product_id} to {new_price}")
-                return True
-            
-        except Exception as e:
-            print(f"Failed to update product {product_id}: {e}")
-            return False
+            history_entry = PriceHistory(
+                product_id = product_id,
+                price = new_price,
+                recorded_at = current_datetime
+            )
+            db.add(history_entry)
+            db.commit()
+            print(f"Updated Product {product_id} to {new_price}")
+            return True
+        
+    except Exception as e:
+        print(f"Failed to update product {product_id}: {e}")
+        return False
 
 # Route for the cron-job to hit and run the tasks to update the price of the products.     
 @router.get('/cron/update_prices')
@@ -253,17 +252,18 @@ async def daily_price_update(token: str = Query(...), db: Session = Depends(get_
     if not products:
         return {'message': 'No products to update.'}
     
-    print(f"Starting bulk update for {len(products)} products...")
+    print(f"Starting sequential update for {len(products)} products...")
 
-    tasks = []
+    success_count = 0
+    fail_count = 0
+
     for product in products:
-        task = update_single_product(product.id, product.amazon_url, db)
-        tasks.append(task)
+        result = await update_single_product(product.id, product.amazon_url, db)
 
-    result = await asyncio.gather(*tasks)
-
-    success_count = result.count(True)
-    fail_count = result.count(False)
+        if result:
+            result += 1
+        else:
+            fail += 1
 
     check_and_send_alerts(db)
 
