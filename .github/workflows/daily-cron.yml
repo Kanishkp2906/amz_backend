@@ -13,4 +13,4 @@ jobs:
       - name: Call Hugging Face Backend
         run: |
           # This curl command hits your server and waits up to 300 seconds (5 mins)
-          curl --max-time 300 "https://YOUR-SPACE-NAME.hf.space/cron/update_prices?token=YOUR_SECURE_TOKEN"
+          curl --max-time 300 "https://kanishkp2906-amz-price-tracker.hf.space/cron/update_prices?token=my_super_secure_cron_secret_29"
