@@ -1,0 +1,16 @@
+name: Trigger Amazon Scraper
+
+on:
+  schedule:
+    # Runs at 00:00 UTC every day
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Allows you to click "Run" manually to test it
+
+jobs:
+  wake-up-server:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Hugging Face Backend
+        run: |
+          # This curl command hits your server and waits up to 300 seconds (5 mins)
+          curl --max-time 300 "https://YOUR-SPACE-NAME.hf.space/cron/update_prices?token=YOUR_SECURE_TOKEN"
