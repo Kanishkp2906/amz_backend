@@ -1,18 +1,21 @@
-# Use the official Playwright image (Includes Python + Chromium)
-FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
+# Use a standard, lightweight Python image (100MB instead of 4GB)
+FROM python:3.10-slim
 
-# Set the working directory
+# Set working directory
 WORKDIR /code
 
-# Copy requirements and install them
+# Copy requirements and install
 COPY ./requirements.txt /code/requirements.txt
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
-# Copy the rest of the application code
+# Copy the app code
 COPY . .
 
-# Create a writable directory for Playwright browsers (Hugging Face permission fix)
-RUN mkdir -p /home/user/app && chmod -R 777 /home/user/app
+# Create a user to run the app (Security Best Practice)
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
 
-# Hugging Face Spaces expects the app to run on port 7860
+# Run the app on port 7860
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
