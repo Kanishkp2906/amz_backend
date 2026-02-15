@@ -1,4 +1,4 @@
-from amz_script import get_amazon_price
+from scrape_script import get_amazon_price
 from sqlalchemy.orm.session import Session
 from sqlalchemy.orm import joinedload
 from fastapi import APIRouter, HTTPException, Depends, status, Cookie, Response, Query
@@ -6,7 +6,7 @@ from database import get_db
 from utils.current_time import get_current_time
 import uuid
 import asyncio
-from config import CRON_SECRET
+from config import CRON_SECRET, SCRAPINGANT_API_KEY
 from typing import List
 from utils.url_shortener import url_shortner
 from models import *
@@ -16,7 +16,7 @@ from schemas.price_history import *
 from schemas.tracking import *
 from utils.email_alert import check_and_send_alerts
 import os
-from random import random
+import random
 
 is_production = os.getenv("RENDER") is not None
 
@@ -55,7 +55,7 @@ async def track_product(
         product_current_price = existing_product.current_price
     
     else:
-        product_data = await get_amazon_price(product_url)
+        product_data = await get_amazon_price(product_url, SCRAPINGANT_API_KEY)
         title = product_data['title']
         current_price = product_data['price']
         image_url = product_data['image_url']
@@ -209,16 +209,21 @@ async def delete_product_tracking(
 # semaphore = asyncio.Semaphore(1)
 
 # Method to update the price and last_checked of the product and create price_history.
-async def update_single_product(product_id: int, url: str, db: Session):
+async def update_single_product(product_id: int, url: str, db: Session, is_retry: bool = False):
     current_datetime = get_current_time()
     try:
         delay = random.uniform(5, 10)
-        print(f"😴 Sleeping for {delay:.2f}s to avoid detection...")
+        print(f"Sleeping for {delay:.2f}s to avoid detection...")
         await asyncio.sleep(delay)
-        print(f"Starting update for: {product_id}...")
-        data = await get_amazon_price(url)
-        new_price = data['price']
 
+        print(f"Starting update for: {product_id}...")
+        data = await get_amazon_price(url, SCRAPINGANT_API_KEY)
+
+        if not data['success'] or data['price'] == 0.0:
+            print(f'Failed to get valid price for product {product_id}')
+            return False
+        
+        new_price = data['price']
         product = db.query(Products).filter(Products.id == product_id).first()
 
         if product:
@@ -234,7 +239,10 @@ async def update_single_product(product_id: int, url: str, db: Session):
             db.commit()
             print(f"Updated Product {product_id} to {new_price}")
             return True
-        
+        else:
+            print(f"Product {product_id} not found in the database")
+            return False
+
     except Exception as e:
         print(f"Failed to update product {product_id}: {e}")
         return False
@@ -252,26 +260,92 @@ async def daily_price_update(token: str = Query(...), db: Session = Depends(get_
     if not products:
         return {'message': 'No products to update.'}
     
+    print(f"\n{'='*60}")
+    print(f"PHASE 1: INITIAL UPDATE")
+    print(f"{'='*60}")
     print(f"Starting sequential update for {len(products)} products...")
 
-    success_count = 0
-    fail_count = 0
+    initial_success = 0
+    initial_failed = 0
+    failed_products = []
 
     for product in products:
         result = await update_single_product(product.id, product.amazon_url, db)
 
         if result:
-            result += 1
+            initial_success += 1
         else:
-            fail += 1
+            initial_failed += 1
+            failed_products.append({
+                "id": product.id,
+                "url": product.amazon_url,
+                "attempts": 0
+            })
+
+    print(f"\nInitial Update Summary:")
+    print(f"Successful: {initial_success}")
+    print(f"Failed: {initial_failed}")
+
+    total_recovered = 0
+    retry_rounds = 0
+
+    if failed_products:
+        for retry_round in range(3):
+            if not failed_products:
+                print(f"\nAll products recovered! Stopping retries early.")
+                break
+            retry_rounds += 1
+            remaining = len(failed_products)
+
+            print(f"\n[Retry Round {retry_rounds}/3]")
+            print(f"Products to retry: {remaining}")
+            print(f"Waiting 2 minutes before retry...")
+
+            await asyncio.sleep(120) # 2 minutes delay
+
+            current_batch = failed_products
+            failed_products = []
+            round_recovered = 0
+
+            for item in current_batch:
+                print(f"Retrying Product {item['id']}...")
+                result = await update_single_product(item['id'], item['url'], db)
+
+                if result:
+                    round_recovered += 1
+                    total_recovered += 1
+                    print(f"Product {item['id']} SUCCESS (Recovered on retry)")
+                else:
+                    item['attempts'] += 1
+                    if item['attempts'] < 3:
+                        failed_products.append(item)
+                        print(f"Product {item['id']}: FAILED (will try again)")
+                    else:
+                        print(f"Product {item['id']}: FAILED (max retries reached)")
+
+    final_failed = len(failed_products)
+    final_success = initial_success + total_recovered
 
     check_and_send_alerts(db)
 
     return {
         'status': 'Completed',
         'total products': len(products),
-        'successful updates': success_count,
-        'failed_updates': fail_count
+        'inital_update': {
+            'successful': initial_success,
+            'failed': initial_failed
+        },
+        'retry_summary': {
+            'rounds_recovered': retry_rounds,
+            'recovered': total_recovered,
+            'still_failed': final_failed,
+            'failed_product_ids': [p['id'] for p in failed_products] if failed_products else []
+        },
+        'final_results': {
+            'successful': final_success,
+            'failed': final_failed,
+            'success_rate_percent': round(final_success/len(products) * 100, 1)
+        }
     }    
 
 # Route to submit the user's email.
